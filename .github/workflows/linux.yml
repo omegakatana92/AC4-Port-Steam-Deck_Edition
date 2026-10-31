@@ -1,0 +1,78 @@
+name: linux
+
+# Builds the preparation and recompilation tools on Linux (the only targets that exist on Linux
+# until the runtime port, docs/LINUX_PORT_PLAN.md Phase 3), runs the synthetic test suite with both
+# compilers, and cross-checks that the Windows branch of the build still compiles.
+
+on:
+  push:
+    branches: [main, linux-native-port]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    name: linux (${{ matrix.cc }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cc: gcc
+            cxx: g++
+          - cc: clang
+            cxx: clang++
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build ${{ matrix.cc == 'clang' && 'clang' || 'g++' }}
+
+      - name: Versions
+        run: |
+          cmake --version | head -1
+          ${{ matrix.cc }} --version | head -1
+          ninja --version
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} \
+            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DAC4_BUILD_TESTS=ON
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Tools respond
+        run: |
+          ./build/ac4-prep || test $? -eq 2
+          ./build/ac4-recomp || test $? -eq 2
+          ./build/ac4-spurecomp || test $? -eq 2
+
+  windows-cross:
+    name: windows branch still compiles (mingw cross)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++-mingw-w64-x86-64-posix
+
+      - name: Configure and build (tools, launcher, tests)
+        run: |
+          cmake -S . -B build-win -G Ninja \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-mingw-w64.cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DAC4_BUILD_TESTS=ON \
+            -DAC4_BUILD_RUNTIME=OFF
+          cmake --build build-win

@@ -1,13 +1,11 @@
 #include "common/ini.h"
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
 #include <algorithm>
 #include <cctype>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
+#include <system_error>
 
 #include "common/file.h"
 
@@ -82,11 +80,14 @@ void Ini::save(const std::filesystem::path& path) const {
   std::filesystem::path tmp = path;
   tmp += ".tmp";
   write_text(tmp, text());
-  if (!MoveFileExW(tmp.wstring().c_str(), path.wstring().c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-    DWORD err = GetLastError();
-    std::error_code ec;
-    std::filesystem::remove(tmp, ec);
-    throw std::runtime_error(strprintf("cannot replace %s (error %lu)", path.string().c_str(), err));
+  // std::filesystem::rename replaces an existing target (POSIX rename(2); MoveFileExW with
+  // MOVEFILE_REPLACE_EXISTING on Windows), so the file is replaced in one step.
+  std::error_code ec;
+  std::filesystem::rename(tmp, path, ec);
+  if (ec) {
+    std::error_code ignored;
+    std::filesystem::remove(tmp, ignored);
+    throw std::runtime_error(strprintf("cannot replace %s (%s)", path.string().c_str(), ec.message().c_str()));
   }
 }
 

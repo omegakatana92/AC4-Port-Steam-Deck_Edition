@@ -69,16 +69,20 @@ std::vector<u8> build(const Map& m) {
   while (keys.size() % 4) keys.push_back(0);
   u32 n = u32(m.size());
   u32 key_table = 20 + 16 * n, data_table = key_table + u32(keys.size());
-  std::vector<u8> out(20);
+  // One allocation, explicit copies: the layout is header, index, keys, data.
+  std::vector<u8> out(size_t(20) + index.size() + keys.size() + data.size(), 0);
   std::memcpy(out.data(), "\0PSF", 4);
   u32 version = 0x101;
   std::memcpy(&out[4], &version, 4);
   std::memcpy(&out[8], &key_table, 4);
   std::memcpy(&out[12], &data_table, 4);
   std::memcpy(&out[16], &n, 4);
-  out.insert(out.end(), index.begin(), index.end());
-  out.insert(out.end(), keys.begin(), keys.end());
-  out.insert(out.end(), data.begin(), data.end());
+  size_t pos = 20;
+  if (!index.empty()) std::memcpy(&out[pos], index.data(), index.size());
+  pos += index.size();
+  if (!keys.empty()) std::memcpy(&out[pos], keys.data(), keys.size());
+  pos += keys.size();
+  if (!data.empty()) std::memcpy(&out[pos], data.data(), data.size());
   return out;
 }
 

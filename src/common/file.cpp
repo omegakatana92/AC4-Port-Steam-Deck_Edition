@@ -1,17 +1,27 @@
 #include "common/file.h"
 
 #include <algorithm>
-#include <cwctype>
+#include <cstring>
 #include <fstream>
 #include <mutex>
 #include <stdexcept>
+
+#ifdef _WIN32
+#include <cwctype>
+#endif
 
 namespace ac4 {
 namespace {
 
 std::mutex g_mu;
 
-std::wstring norm(const fs::path& p) {
+// Canonical form used to compare paths: absolute, without "." / ".." or a trailing separator.
+// Windows keeps the release's wide-character, case-insensitive comparison with '\' separators;
+// POSIX compares the UTF-8 bytes with '/', where case is significant.
+#ifdef _WIN32
+using NormPath = std::wstring;
+constexpr wchar_t kSep = L'\\';
+NormPath norm(const fs::path& p) {
   std::error_code ec;
   fs::path abs = fs::weakly_canonical(fs::absolute(p, ec), ec);
   std::wstring s = (ec ? fs::absolute(p) : abs).wstring();
@@ -22,11 +32,22 @@ std::wstring norm(const fs::path& p) {
   while (s.size() > 3 && s.back() == L'\\') s.pop_back();
   return s;
 }
+#else
+using NormPath = std::string;
+constexpr char kSep = '/';
+NormPath norm(const fs::path& p) {
+  std::error_code ec;
+  fs::path abs = fs::weakly_canonical(fs::absolute(p, ec), ec);
+  std::string s = (ec ? fs::absolute(p) : abs).generic_string();
+  while (s.size() > 1 && s.back() == '/') s.pop_back();
+  return s;
+}
+#endif
 
 // Built-in protected roots: the game folder inside the project root (tools run from the root)
 // and, on the development PC, the read/copy-only reference projects and the Manager's records.
 // Each tool also adds the game folders it is given at runtime.
-std::vector<std::wstring> g_protected = {
+std::vector<NormPath> g_protected = {
     norm(fs::current_path() / "Armored Core 4 (USA)"),
 };
 
@@ -38,10 +59,10 @@ void add_protected_root(const fs::path& p) {
 }
 
 void guard_write(const fs::path& p) {
-  std::wstring n = norm(p);
+  NormPath n = norm(p);
   std::lock_guard lk(g_mu);
   for (const auto& r : g_protected) {
-    if (n == r || (n.size() > r.size() && n.compare(0, r.size(), r) == 0 && n[r.size()] == L'\\'))
+    if (n == r || (n.size() > r.size() && n.compare(0, r.size(), r) == 0 && n[r.size()] == kSep))
       throw std::runtime_error("refusing to write inside protected read-only tree: " + p.string());
   }
 }

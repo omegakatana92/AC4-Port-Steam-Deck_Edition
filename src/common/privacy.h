@@ -5,8 +5,9 @@
 
 namespace ac4 {
 
-// `text` with the profile folder written as %USERPROFILE% and the account name, where it stands
-// as a path component or a word of its own, as <user> (both slash styles, any letter case).
+// `text` with the profile folder written as %USERPROFILE% (Windows) or ~ (POSIX), and the account
+// name, where it stands as a path component or a word of its own, as <user> (both slash styles, any
+// letter case).
 std::string redact_personal(const std::string& text);
 
 }  // namespace ac4

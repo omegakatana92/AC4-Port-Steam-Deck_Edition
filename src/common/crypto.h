@@ -1,5 +1,5 @@
-// Thin wrappers over Windows CNG (bcrypt): the hashes that check the player's files. All
-// functions throw std::runtime_error on failure.
+// The hashes that check the player's files (common/sha.cpp). All functions throw
+// std::runtime_error on failure.
 #pragma once
 #include <array>
 #include <map>
