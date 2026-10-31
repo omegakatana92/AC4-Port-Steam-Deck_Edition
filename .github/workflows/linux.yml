@@ -28,7 +28,10 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build ${{ matrix.cc == 'clang' && 'clang' || 'g++' }}
+          sudo apt-get install -y python3-pip ${{ matrix.cc == 'clang' && 'clang' || 'g++' }}
+          # Ubuntu 22.04 ships CMake 3.22; the project needs 3.25 or newer.
+          python3 -m pip install --user "cmake>=3.25" ninja
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Versions
         run: |
@@ -66,7 +69,9 @@ jobs:
       - name: Install cross toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build g++-mingw-w64-x86-64-posix
+          sudo apt-get install -y python3-pip g++-mingw-w64-x86-64-posix
+          python3 -m pip install --user "cmake>=3.25" ninja
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Configure and build (tools, launcher, tests)
         run: |
